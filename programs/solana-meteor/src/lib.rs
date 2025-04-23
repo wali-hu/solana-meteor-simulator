@@ -26,6 +26,31 @@ pub mod solana_meteor {
             err!(ErrorCode::NotActivatedYet)
         }
     }
+
+    /// Sets a simulated timestamp for testing
+    pub fn set_simulated_time(ctx: Context<SetSimulatedTime>, simulated_timestamp: i64) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        pool.simulated_timestamp = Some(simulated_timestamp);
+        Ok(())
+    }
+
+     /// Activates the pool using either real or simulated time
+     pub fn activate_with_simulation(ctx: Context<Activate>) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        
+        // Use simulated time if available, otherwise real clock
+        let current_time = match pool.simulated_timestamp {
+            Some(time) => time,
+            None => Clock::get()?.unix_timestamp,
+        };
+        
+        if current_time >= pool.activation_point {
+            pool.is_active = true;
+            Ok(())
+        } else {
+            err!(ErrorCode::NotActivatedYet)
+        }
+    }
 }
 
 #[derive(Accounts)]
@@ -43,10 +68,17 @@ pub struct Activate<'info> {
     pub pool: Account<'info, MeteorPool>,
 }
 
+#[derive(Accounts)]
+pub struct SetSimulatedTime<'info> {
+    #[account(mut)]
+    pub pool: Account<'info, MeteorPool>,
+}
+
 #[account]
 pub struct MeteorPool {
     pub activation_point: i64,
     pub is_active: bool,
+    pub simulated_timestamp: Option<i64>,
 }
 
 #[error_code]
