@@ -1,14 +1,21 @@
 import * as anchor from '@project-serum/anchor';
-import { Program } from '@project-serum/anchor';
-import { SolanaMeteor } from '../target/types/solana_meteor';
-import { SystemProgram, Keypair } from '@solana/web3.js';
+import { Program, AnchorProvider } from '@project-serum/anchor';
+import { SystemProgram, Keypair, PublicKey } from '@solana/web3.js';
 import { BN } from 'bn.js';
 import assert from 'assert';
 
-describe('solana_meteor (Milestone 1)', () => {
-  const provider = anchor.AnchorProvider.local();
+// ✅ Import raw IDL and safely extract the usable portion
+import rawIdl from '../target/idl/solana_meteor.json';
+import { Idl } from '@project-serum/anchor';
+
+describe('solana_meteor (Milestone 1)', () => {
+  const provider = AnchorProvider.local();
   anchor.setProvider(provider);
-  const program = provider.workspace.SolanaMeteor as Program<SolanaMeteor>;
+
+  // ✅ Strip out non-IDL fields safely
+  const { address, metadata, ...idl } = rawIdl;
+  const programId = new PublicKey(address);
+  const program = new Program(idl as unknown as Idl, programId, provider);
 
   let poolAccount: Keypair;
 
@@ -31,7 +38,9 @@ describe('solana_meteor (Milestone 1)', () => {
       .accounts({ pool: poolAccount.publicKey })
       .rpc();
 
-    const pool = await program.account.meteorPool.fetch(poolAccount.publicKey);
+    const pool = await program.account.meteorPool.fetch(poolAccount.publicKey) as {
+      isActive: boolean;
+    };
     assert.equal(pool.isActive, true);
   });
 

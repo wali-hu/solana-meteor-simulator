@@ -15,3 +15,7 @@ codegen-units = 1
 
 [build]
 rustflags = ["--cfg", "procmacro2_semver_exempt"]
+
+
+[patch.crates-io]
+anchor-lang = { git = "https://github.com/solana-foundation/anchor", rev = "54d5396" }
