@@ -4,6 +4,7 @@
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check",
     "build:simulator": "tsc -p simulator/tsconfig.json",
+    "start": "ts-node simulator/src/index.ts",
     "simulator": "ts-node simulator/src/index.ts"
   },
   "dependencies": {

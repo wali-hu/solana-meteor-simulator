@@ -94,4 +94,65 @@ program
     }
   });
 
+  program
+  .command('mock-swap')
+  .description('Mock a token swap simulation')
+  .requiredOption('-a, --token-a <address>', 'First token mint address')
+  .requiredOption('-b, --token-b <address>', 'Second token mint address')
+  .requiredOption('-i, --input-amount <amount>', 'Amount to swap (in standard units)')
+  .option('-s, --slippage <percentage>', 'Slippage tolerance percentage', '0.5')
+  .option('-r, --rpc <url>', 'RPC endpoint URL', process.env.RPC_ENDPOINT || 'https://api.devnet.solana.com')
+  .action(async (options) => {
+    try {
+      // Import the mockSimulateSwap function
+      const { mockSimulateSwap } = await import('./mockSimulator');
+      
+      // Setup connection
+      console.log(chalk.cyan(`Connecting to RPC: ${options.rpc}`));
+      const connection = new Connection(options.rpc);
+      
+      // Load wallet
+      let wallet: Keypair;
+      try {
+        wallet = loadWalletFromEnv();
+        console.log(chalk.green('Using wallet from .env file:'), wallet.publicKey.toString());
+      } catch (e) {
+        console.log(chalk.yellow('No wallet in .env, creating dummy wallet...'));
+        wallet = createDummyWallet();
+        console.log(chalk.green('Using dummy wallet:'), wallet.publicKey.toString());
+      }
+      
+      // Create pool config
+      const tokenAMint = new PublicKey(options.tokenA || options['token-a']);
+      const tokenBMint = new PublicKey(options.tokenB || options['token-b']);
+      
+      console.log(chalk.cyan('\nPool Parameters:'));
+      console.log(`Token A: ${tokenAMint.toString()}`);
+      console.log(`Token B: ${tokenBMint.toString()}`);
+      console.log(`Input Amount: ${options.inputAmount}`);
+      console.log(`Slippage: ${options.slippage}%`);
+      
+      // Run mock simulation
+      console.log(chalk.cyan('\nRunning mock simulation...'));
+      const result = await mockSimulateSwap(
+        connection,
+        wallet.publicKey,
+        tokenAMint,
+        tokenBMint,
+        parseFloat(options.inputAmount)
+      );
+      
+      // Display results
+      displaySimulationResults(result);
+      
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(chalk.red('Error:'), error.message);
+      } else {
+        console.error(chalk.red('Error:'), String(error));
+      }
+      process.exit(1);
+    }
+  });
+
 program.parse();
