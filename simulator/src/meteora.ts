@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import axios from 'axios';
 import { 
   Connection, 
@@ -5,35 +8,35 @@ import {
   Transaction, 
   TransactionInstruction, 
   SystemProgram, 
-  LAMPORTS_PER_SOL, 
   Keypair 
 } from '@solana/web3.js';
-import { 
-  TOKEN_PROGRAM_ID, 
-  getAssociatedTokenAddress, 
-  createAssociatedTokenAccountInstruction 
+import {
+  TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction
 } from '@solana/spl-token';
 
 // Meteora program IDs
 export const METEORA_DLMM_PROGRAM_ID = new PublicKey('LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo');
-const METEORA_API_URL = 'https://api.meteora.ag/v1';
+const METEORA_API_URL =
+  process.env.METEORA_API_URL ||
+  'https://universal-search-api.meteora.ag/pool';
 
-// Token info cache to avoid duplicate fetches
-const tokenInfoCache = new Map();
 
 // Interface for Meteora pool data
 interface MeteoraPool {
   address: string;
-  tokenA: {
-    mint: string;
-    decimals: number;
-  };
-  tokenB: {
-    mint: string;
-    decimals: number;
-  };
+  tokenA: { mint: string; decimals: number };
+  tokenB: { mint: string; decimals: number };
   fee: number;
 }
+
+// Token info cache to avoid duplicate fetches
+const tokenInfoCache = new Map<string, {
+  address: string;
+  decimals: number;
+  symbol: string;
+}>();
 
 /**
  * Fetch token information from the Solana blockchain
@@ -95,54 +98,48 @@ async function getTokenInfo(connection: Connection, mintAddress: string) {
 }
 
 /**
- * Search for Meteora pools matching the given token pair
+ * Search for a Meteora DLMM pool via Universal Search API
  */
-async function findMeteoraPool(tokenAMint: string, tokenBMint: string): Promise<MeteoraPool | null> {
+async function findMeteoraPool(
+  tokenAMint: string,
+  tokenBMint: string
+): Promise<MeteoraPool | null> {
   try {
-    // Use Meteora's Universal Search API to find pools
     const response = await axios.get(`${METEORA_API_URL}/search`, {
       params: {
-        tokenA: tokenAMint,
-        tokenB: tokenBMint
+        q: [tokenAMint, tokenBMint].join(','),        // comma-separated mints
+        query_by: 'pool_mint,pool_name,token_mints',                    // search by token mints
+        sort_by: 'tvl:desc',                         // highest liquidity first
+        facet_by: 'pool_type'                        // group by pool type
       }
-    });
-    
-    if (response.data && response.data.data && response.data.data.pools && response.data.data.pools.length > 0) {
-      // Filter for Meteora pools
-      const meteoraPools = response.data.data.pools.filter((pool: any) => 
-        pool.type === 'DLMM' && pool.programId === METEORA_DLMM_PROGRAM_ID.toString()
+    }); // axios GET with params :contentReference[oaicite:7]{index=7}
+
+    // Universal Search returns pools under data.pools or top-level pools
+    const pools: any[] =
+      response.data.data?.pools || response.data.pools || [];
+
+    const dlmmPools = pools.filter(p => p.pool_type === 'DLMM' || p.facet === 'DLMM');
+
+    if (dlmmPools.length === 0) {
+      console.log(`No DLMM pool found for ${tokenAMint}/${tokenBMint}`);
+      return null;
+    }
+
+    const best = dlmmPools[0];
+    return {
+      address: best.address,
+      tokenA: { mint: best.tokenA.mint, decimals: best.tokenA.decimals },
+      tokenB: { mint: best.tokenB.mint, decimals: best.tokenB.decimals },
+      fee: best.fee ?? 0.0025
+    };
+  } catch (err: any) {
+    if (err.code === 'ENOTFOUND') {
+      console.error(
+        'DNS lookup failed for Meteora API. Check METEORA_API_URL in your .env.'
       );
-      
-      if (meteoraPools.length > 0) {
-        const bestPool = meteoraPools[0]; // Take the first pool for simplicity
-        return {
-          address: bestPool.address,
-          tokenA: {
-            mint: bestPool.tokenA.mint,
-            decimals: bestPool.tokenA.decimals
-          },
-          tokenB: {
-            mint: bestPool.tokenB.mint,
-            decimals: bestPool.tokenB.decimals
-          },
-          fee: bestPool.fee || 0.0025 // Default to 0.25% if fee is not specified
-        };
-      }
+    } else {
+      console.error('Error fetching Meteora pool:', err);
     }
-    
-    console.log(`No matching Meteora pool found for ${tokenAMint}/${tokenBMint}`);
-    
-    // Create a mock pool for demonstration purposes when no real pool exists
-    // This allows the simulation to continue for educational purposes
-    const mockPool = createMockMeteoraPool(tokenAMint, tokenBMint);
-    if (mockPool) {
-      console.log("Using mock Meteora pool for simulation purposes");
-      return mockPool;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Error finding Meteora pool:', error);
     return null;
   }
 }
@@ -292,7 +289,7 @@ export async function buildMeteoraSwapTransaction(
     const transaction = new Transaction();
     
     // For a real implementation, you would:
-    // 1. Get the user's associated token accounts
+    // 1. Get the user's associated token accounts  
     const inputTokenAccount = await getAssociatedTokenAddress(tokenAMint, wallet.publicKey);
     const outputTokenAccount = await getAssociatedTokenAddress(tokenBMint, wallet.publicKey);
     

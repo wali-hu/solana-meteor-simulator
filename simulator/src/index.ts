@@ -1,130 +1,167 @@
+#!/usr/bin/env node
 import dotenv from 'dotenv';
+dotenv.config();  // Load .env variables
+
 import { program } from 'commander';
-import { Connection, Keypair } from '@solana/web3.js';
+import {
+  Connection,
+  Keypair,
+  SimulateTransactionConfig,
+  Transaction,
+  TransactionMessage,
+  VersionedTransaction,
+} from '@solana/web3.js';
 import bs58 from 'bs58';
+
 import { mockOrcaSwapSimulation } from './mockSimulator';
 import { mockMeteoraSwapSimulation } from './mockMeteoraSimulator';
 import { buildMeteoraSwapTransaction } from './meteora';
 
-dotenv.config();
+// Simulation config for the new overload
+const simConfig: SimulateTransactionConfig = {
+  replaceRecentBlockhash: true,
+  sigVerify: false,
+  commitment: 'confirmed',
+};
 
-// Create connection to Solana network
-const connection = new Connection(process.env.RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com');
+// Default Solana connection (can be overridden per-command)
+const defaultConnection = new Connection(
+  process.env.RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com',
+  'confirmed'
+);
 
-// Load wallet from private key in .env
-const wallet = process.env.WALLET_PRIVATE_KEY 
+// Load or generate wallet
+const wallet = process.env.WALLET_PRIVATE_KEY
   ? Keypair.fromSecretKey(bs58.decode(process.env.WALLET_PRIVATE_KEY))
-  : Keypair.generate(); // Generate a new keypair if none provided
+  : Keypair.generate();
 
 async function main() {
   program
-    .version('0.1.0')
+    .version('1.0.0')
     .description('Solana transaction simulator for Orca and Meteora swaps');
 
-  // Existing Orca commands
+  // Mock Orca swap
   program
     .command('mock-orca')
     .description('Simulate an Orca swap without sending a transaction')
-    .requiredOption('--token-a <address>', 'Token A address')
-    .requiredOption('--token-b <address>', 'Token B address')
-    .requiredOption('--input-amount <amount>', 'Input amount')
-    .option('--slippage <percentage>', 'Slippage tolerance percentage', '1')
-    .action(async (options) => {
+    .requiredOption('--token-a <address>')
+    .requiredOption('--token-b <address>')
+    .requiredOption('--input-amount <amount>')
+    .option('--slippage <percent>', 'Slippage tolerance', '1')
+    .action(async (opts) => {
       const result = await mockOrcaSwapSimulation(
-        connection,
+        defaultConnection,
         wallet,
-        options.tokenA,
-        options.tokenB,
-        parseFloat(options.inputAmount),
-        parseFloat(options.slippage)
+        opts.tokenA,
+        opts.tokenB,
+        parseFloat(opts.inputAmount),
+        parseFloat(opts.slippage)
       );
-      
       console.log('\nMock Orca Swap Simulation Results:');
       console.log(`Success: ${result.success}`);
-      console.log(`Compute Units: ${result.computeUnits || 'N/A'}`);
-      if (result.outputAmount) {
+      console.log(`Compute Units: ${result.computeUnits ?? 'N/A'}`);
+      if (result.outputAmount != null) {
         console.log(`Output Amount: ${result.outputAmount}`);
       }
       if (result.error) {
         console.log(`Error: ${result.error}`);
       }
       console.log('\nTransaction Logs:');
-      result.logs.forEach((log: string) => console.log(log));
+      result.logs.forEach((log) => console.log(log));
     });
 
-  // New Meteora commands
+  // Mock Meteora swap
   program
     .command('mock-meteora')
     .description('Simulate a Meteora swap without sending a transaction')
-    .requiredOption('--token-a <address>', 'Token A address')
-    .requiredOption('--token-b <address>', 'Token B address')
-    .requiredOption('--input-amount <amount>', 'Input amount')
-    .option('--slippage <percentage>', 'Slippage tolerance percentage', '1')
-    .action(async (options) => {
+    .requiredOption('--token-a <address>')
+    .requiredOption('--token-b <address>')
+    .requiredOption('--input-amount <amount>')
+    .option('--slippage <percent>', 'Slippage tolerance', '1')
+    .action(async (opts) => {
       const result = await mockMeteoraSwapSimulation(
-        connection,
+        defaultConnection,
         wallet,
-        options.tokenA,
-        options.tokenB,
-        parseFloat(options.inputAmount),
-        parseFloat(options.slippage)
+        opts.tokenA,
+        opts.tokenB,
+        parseFloat(opts.inputAmount),
+        parseFloat(opts.slippage)
       );
-      
       console.log('\nMock Meteora Swap Simulation Results:');
       console.log(`Success: ${result.success}`);
-      console.log(`Compute Units: ${result.computeUnits || 'N/A'}`);
-      if (result.outputAmount) {
+      console.log(`Compute Units: ${result.computeUnits ?? 'N/A'}`);
+      if (result.outputAmount != null) {
         console.log(`Output Amount: ${result.outputAmount}`);
       }
       if (result.error) {
         console.log(`Error: ${result.error}`);
       }
       console.log('\nTransaction Logs:');
-      result.logs.forEach(log => console.log(log));
+      result.logs.forEach((log) => console.log(log));
     });
 
+  // Real Meteora swap simulation (on-chain data, no broadcast)
   program
     .command('meteora-swap')
     .description('Simulate a real Meteora swap (no execution)')
-    .requiredOption('--token-a <address>', 'Token A address')
-    .requiredOption('--token-b <address>', 'Token B address')
-    .requiredOption('--input-amount <amount>', 'Input amount')
-    .option('--slippage <percentage>', 'Slippage tolerance percentage', '1')
-    .action(async (options) => {
+    .requiredOption('--token-a <address>')
+    .requiredOption('--token-b <address>')
+    .requiredOption('--input-amount <amount>')
+    .option('--slippage <percent>', 'Slippage tolerance', '1')
+    .option('--rpc-url <url>', 'Override RPC endpoint')
+    .option('--real', 'Use real Meteora pool discovery and instructions')
+    .action(async (opts) => {
       try {
-        // Build a Meteora swap transaction
-        const transaction = await buildMeteoraSwapTransaction(
+        // Choose default or custom connection
+        const connection = opts.rpcUrl
+          ? new Connection(opts.rpcUrl, 'confirmed')
+          : defaultConnection;
+
+        // Build the legacy Transaction
+        const tx: Transaction | null = await buildMeteoraSwapTransaction(
           connection,
           wallet,
-          options.tokenA,
-          options.tokenB,
-          parseFloat(options.inputAmount),
-          parseFloat(options.slippage)
+          opts.tokenA,
+          opts.tokenB,
+          parseFloat(opts.inputAmount),
+          parseFloat(opts.slippage)
         );
-        
-        if (!transaction) {
+        if (!tx) {
           console.error('Failed to build Meteora swap transaction');
           return;
         }
-        
-        // Simulate the transaction
-        const simulation = await connection.simulateTransaction(transaction);
-        
+
+        // Convert to a VersionedTransaction
+        const messageV0 = new TransactionMessage({
+          payerKey: wallet.publicKey,
+          recentBlockhash: tx.recentBlockhash!,
+          instructions: tx.instructions,
+        }).compileToV0Message();
+
+        const versionedTx = new VersionedTransaction(messageV0);
+
+        // Simulate using the new overload and config
+        const simulation = await connection.simulateTransaction(
+          versionedTx,
+          simConfig
+        );
+
         console.log('\nMeteora Swap Simulation Results:');
-        console.log(`Success: ${simulation.value.err ? false : true}`);
-        console.log(`Compute Units: ${simulation.value.unitsConsumed || 'N/A'}`);
-        
+        console.log(`Success: ${simulation.value.err == null}`);
+        console.log(
+          `Compute Units: ${simulation.value.unitsConsumed ?? 'N/A'}`
+        );
         if (simulation.value.err) {
           console.log(`Error: ${JSON.stringify(simulation.value.err)}`);
         }
-        
         console.log('\nTransaction Logs:');
-        simulation.value.logs?.forEach(log => console.log(log));
-      } catch (error) {
-        console.error('Meteora swap simulation failed:', error);
+        simulation.value.logs?.forEach((log) => console.log(log));
+      } catch (err) {
+        console.error('Meteora swap simulation failed:', err);
       }
     });
 
+  // Parse CLI args and run
   await program.parseAsync(process.argv);
 }
 
