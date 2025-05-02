@@ -16,6 +16,7 @@ import bs58 from 'bs58';
 import { mockOrcaSwapSimulation } from './mockSimulator';
 import { mockMeteoraSwapSimulation } from './mockMeteoraSimulator';
 import { buildMeteoraSwapTransaction } from './meteora';
+import { runSolUsdcSwapSimulation } from './solUsdcSwap';
 
 // Simulation config for the new overload
 const simConfig: SimulateTransactionConfig = {
@@ -158,6 +159,17 @@ async function main() {
         simulation.value.logs?.forEach((log) => console.log(log));
       } catch (err) {
         console.error('Meteora swap simulation failed:', err);
+      }
+    });
+
+  program
+    .command('sol-usdc-swap')
+    .description('Discover SOL/USDC DLMM pool on Mainnet and simulate swap')
+    .action(async () => {
+      try {
+        await runSolUsdcSwapSimulation();
+      } catch (err) {
+        console.error('Error:', err);
       }
     });
 
