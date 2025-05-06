@@ -1,9 +1,8 @@
-// simulator/src/mockMeteoraSimulator.ts
+
 import { 
     Connection, 
     PublicKey, 
     Transaction, 
-    TransactionInstruction, 
     SimulatedTransactionResponse, 
     Keypair 
   } from '@solana/web3.js';
@@ -21,7 +20,7 @@ import {
   }
   
   /**
-   * Perform a mock simulation of a Meteora swap
+   * Perform a simulation of a Meteora swap
    */
   export async function mockMeteoraSwapSimulation(
     connection: Connection,
@@ -38,7 +37,7 @@ import {
       const tokenAMint = new PublicKey(tokenA);
       const tokenBMint = new PublicKey(tokenB);
       
-      // Determine token decimals (in a real app, you'd fetch this from the chain)
+
       let tokenADecimals = 6; // Default for USDC
       let tokenBDecimals = 9; // Default for SOL
       
@@ -55,36 +54,32 @@ import {
         tokenBDecimals = 6; // USDC
       }
       
-      // Mock price for token pair (simplified)
-      let price = 10.5; // Default price for USDC/SOL
+      let price = 10.5; 
       
-      // Adjust price based on the direction of the swap
+
       if (tokenA === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' && 
           tokenB === 'So11111111111111111111111111111111111111112') {
-        // USDC to SOL price
+
         price = 10.5;
       } else if (tokenA === 'So11111111111111111111111111111111111111112' && 
                  tokenB === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') {
-        // SOL to USDC price
+
         price = 0.095;
       }
       
-      // Calculate expected output
       const expectedOutput = calculateExpectedOutput(
         inputAmount,
         tokenADecimals,
         tokenBDecimals,
         price,
-        0.0025 // Meteora fee of 0.25%
+        0.0025 
       );
       
-      // Calculate output with slippage
+
       const outputWithSlippage = expectedOutput * (1 - slippage / 100);
-      
-      // Mock compute units for Meteora swap
+
       const computeUnits = 35000 + Math.floor(Math.random() * 15000);
       
-      // Generate mock logs
       const logs = [
         `Program ${METEORA_DLMM_PROGRAM_ID.toString()} invoke [1]`,
         `Program log: Instruction: Swap`,
@@ -113,15 +108,11 @@ import {
     }
   }
   
-  /**
-   * Simulate a Meteora swap using a real Transaction but without execution
-   */
+
   export async function simulateMeteoraSwap(
     connection: Connection,
     transaction: Transaction
   ): Promise<SimulatedTransactionResponse> {
-    // We would typically call simulateTransaction here,
-    // but for the mock simulator, we can create our own response
     const simulationResponse: SimulatedTransactionResponse = {
       err: null,
       logs: [
