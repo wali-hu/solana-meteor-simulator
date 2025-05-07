@@ -33,36 +33,34 @@ import {
     try {
       console.log(`Mock simulating Meteora swap of ${inputAmount} tokens from ${tokenA} to ${tokenB}`);
       
-      // Convert string addresses to PublicKey objects
       const tokenAMint = new PublicKey(tokenA);
       const tokenBMint = new PublicKey(tokenB);
       
 
-      let tokenADecimals = 6; // Default for USDC
-      let tokenBDecimals = 9; // Default for SOL
+      let tokenADecimals = 6;
+      let tokenBDecimals = 9; 
       
-      // Check for known token addresses
       if (tokenA === 'So11111111111111111111111111111111111111112') {
-        tokenADecimals = 9; // SOL
-      } else if (tokenA === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') {
-        tokenADecimals = 6; // USDC
+        tokenADecimals = 9; 
+      } else if (tokenA === 'DCSTMVT3uGY2K1UnQAvA37ujQrW16bgxpErCseQZ3qV') {
+        tokenADecimals = 6; 
       }
       
       if (tokenB === 'So11111111111111111111111111111111111111112') {
-        tokenBDecimals = 9; // SOL
-      } else if (tokenB === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') {
-        tokenBDecimals = 6; // USDC
+        tokenBDecimals = 9; 
+      } else if (tokenB === 'DCSTMVT3uGY2K1UnQAvA37ujQrW16bgxpErCseQZ3qV') {
+        tokenBDecimals = 6; 
       }
       
       let price = 10.5; 
       
 
-      if (tokenA === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' && 
+      if (tokenA === 'DCSTMVT3uGY2K1UnQAvA37ujQrW16bgxpErCseQZ3qV' && 
           tokenB === 'So11111111111111111111111111111111111111112') {
 
         price = 10.5;
       } else if (tokenA === 'So11111111111111111111111111111111111111112' && 
-                 tokenB === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') {
+                 tokenB === 'DCSTMVT3uGY2K1UnQAvA37ujQrW16bgxpErCseQZ3qV') {
 
         price = 0.095;
       }
