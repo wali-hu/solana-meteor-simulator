@@ -1,6 +1,6 @@
 # Solana Meteor Simulator
 
-A CLI-based simulation tool for Solana blockchain swaps using Meteora DLMM and Orca AMM pools. The simulator supports both **mock** (in-memory) and **real** (on-chain) modes to predict compute unit consumption, token outputs, and logs without broadcasting transactions.
+A CLI-based simulation tool for Solana blockchain swaps using Meteora DLMM and Orca AMM pools. The simulator supports **real** (on-chain) to predict compute unit consumption, token outputs, and logs without broadcasting transactions.
 
 ---
 
@@ -12,7 +12,7 @@ A CLI-based simulation tool for Solana blockchain swaps using Meteora DLMM and O
 * [Configuration](#configuration)
 * [Usage](#usage)
 
-  * [Mock Simulation (Meteora)](#mock-simulation-meteora)
+  * [Meteora Simulation](#meteora-simulation)
 * [File Structure](#file-structure)
 * [Development](#development)
 * [License](#license)
@@ -66,12 +66,12 @@ METEORA_API_URL=https://universal-search-api.meteora.ag/pool
 
 All commands are invoked via the `simulator` script defined in `package.json`.
 
-### Mock Simulation (Meteora)
+### Meteora Simulation
 
-Simulate a Meteora swap entirely in-memory:
+Simulate a Meteora swap entirely on chain:
 
 ```bash
-npm run simulator -- mock-meteora \
+npm run simulator -- meteora-swap \
   --token-a <TOKEN_A_MINT> \
   --token-b <TOKEN_B_MINT> \
   --input-amount 10 \
@@ -85,7 +85,7 @@ npm run simulator -- mock-meteora \
 │   ├── src/
 │   │   ├── index.ts           # CLI entry point
 │   │   ├── meteora.ts         # Build & quote functions for Meteora pools
-│   │   ├── mockMeteoraSimulator.ts  # In-memory Meteora mocks
+│   │   ├── meteoraSimulator.ts  # Helper Configuration for simulation
 │   └── tsconfig.json
 ├── program/                   # Anchor/Rust Meteor Pool contract
 ├── .env                       # Environment variables (not in repo)
