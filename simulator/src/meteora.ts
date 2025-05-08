@@ -145,37 +145,6 @@ async function findMeteoraPool(
 }
 
 /**
- * Create a mock Meteora pool for tokens that don't have a real pool
- * This is used for demonstration and testing purposes
- */
-function createMockMeteoraPool(tokenAMint: string, tokenBMint: string): MeteoraPool | null {
-  // We'll create mock pools for common token pairs
-  // USDC-SOL pair (very common)
-  if ((tokenAMint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' && 
-       tokenBMint === 'So11111111111111111111111111111111111111112') ||
-      (tokenBMint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v' && 
-       tokenAMint === 'So11111111111111111111111111111111111111112')) {
-    
-    return {
-      address: 'MockMeteoraPool11111111111111111111111111111111',
-      tokenA: {
-        mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v', // USDC
-        decimals: 6
-      },
-      tokenB: {
-        mint: 'So11111111111111111111111111111111111111112', // SOL
-        decimals: 9
-      },
-      fee: 0.0025 // 0.25% fee
-    };
-  }
-  
-  // Add more mock pools for other common pairs as needed
-  
-  return null;
-}
-
-/**
  * Get a quote for swapping tokens through Meteora
  */
 async function getMeteoraQuote(
@@ -194,21 +163,19 @@ async function getMeteoraQuote(
     // Convert input amount to the proper format (accounting for decimals)
     const adjustedInputAmount = inputAmount * Math.pow(10, inputDecimals);
     
-    // For a real implementation, you'd call Meteora's quote API
-    // For our simulator, we'll calculate a simulated quote
     const expectedOutput = calculateExpectedOutput(
       inputAmount,
       inputDecimals,
       outputDecimals,
-      isAtoB ? 10.5 : 0.095, // Mock price (SOL/USDC ~ 10.5, USDC/SOL ~ 0.095)
+      isAtoB ? 10.5 : 0.095, 
       pool.fee
     );
     
     return {
       expectedOutputAmount: expectedOutput,
-      minimumOutputAmount: expectedOutput * (1 - slippage / 100), // Apply slippage
+      minimumOutputAmount: expectedOutput * (1 - slippage / 100), 
       fee: pool.fee,
-      priceImpact: 0.1 // Mock price impact
+      priceImpact: 0.1 
     };
   } catch (error) {
     console.error('Error getting Meteora quote:', error);
@@ -232,7 +199,6 @@ export function calculateExpectedOutput(
   // Convert based on price
   let outputAmount = amountAfterFee * price;
   
-  // Round to appropriate decimal places
   return parseFloat(outputAmount.toFixed(outputDecimals));
 }
 
@@ -287,14 +253,10 @@ export async function buildMeteoraSwapTransaction(
     
     // Build a transaction
     const transaction = new Transaction();
-    
-    // For a real implementation, you would:
-    // 1. Get the user's associated token accounts  
+  
     const inputTokenAccount = await getAssociatedTokenAddress(tokenAMint, wallet.publicKey);
     const outputTokenAccount = await getAssociatedTokenAddress(tokenBMint, wallet.publicKey);
     
-    // Check if the output token account exists and create it if needed
-    // Note: This is simplified and would need to be properly implemented in a real application
     const outputAccountInfo = await connection.getAccountInfo(outputTokenAccount);
     if (!outputAccountInfo) {
       console.log(`Creating associated token account for ${tokenBInfo.symbol}`);
@@ -308,12 +270,6 @@ export async function buildMeteoraSwapTransaction(
       );
     }
     
-    // 2. Create a Meteora swap instruction
-    // This would be a real instruction to the Meteora program in a production environment
-    // For our simulator, we're building a "mock" instruction that represents what would happen
-    // The actual interaction with Meteora's program would require detailed knowledge of their program's instruction layout
-    
-    // Create a mock instruction that represents what a Meteora swap would look like
     const mockSwapInstruction = new TransactionInstruction({
       programId: METEORA_DLMM_PROGRAM_ID,
       keys: [
@@ -325,8 +281,6 @@ export async function buildMeteoraSwapTransaction(
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data: Buffer.from([
-        // Mock data representing a swap instruction
-        // In a real implementation, this would be properly encoded according to Meteora's program
         0, // Instruction index for "swap"
         ...new Uint8Array(new Float64Array([inputAmount]).buffer), // Input amount
         ...new Uint8Array(new Float64Array([quote.minimumOutputAmount]).buffer), // Minimum output

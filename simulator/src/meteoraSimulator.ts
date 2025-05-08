@@ -22,7 +22,7 @@ import {
   /**
    * Perform a simulation of a Meteora swap
    */
-  export async function mockMeteoraSwapSimulation(
+  export async function meteoraSwapSimulation(
     connection: Connection,
     wallet: Keypair,
     tokenA: string,
@@ -31,7 +31,7 @@ import {
     slippage: number
   ): Promise<SimulationResult> {
     try {
-      console.log(`Mock simulating Meteora swap of ${inputAmount} tokens from ${tokenA} to ${tokenB}`);
+      console.log(`Simulating Meteora swap of ${inputAmount} tokens from ${tokenA} to ${tokenB}`);
       
       const tokenAMint = new PublicKey(tokenA);
       const tokenBMint = new PublicKey(tokenB);

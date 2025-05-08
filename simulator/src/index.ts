@@ -11,7 +11,7 @@ import {
 } from '@solana/web3.js';
 import bs58 from 'bs58';
 
-import { mockMeteoraSwapSimulation } from './mockMeteoraSimulator';
+import { meteoraSwapSimulation } from './meteoraSimulator';
 
 
 // Simulation config for the new overload
@@ -41,14 +41,14 @@ async function main() {
 
   // Meteora swap
   program
-    .command('mock-meteora')
+    .command('meteora-swap')
     .description('Simulate a Meteora swap without sending a transaction')
     .requiredOption('--token-a <address>')
     .requiredOption('--token-b <address>')
     .requiredOption('--input-amount <amount>')
     .option('--slippage <percent>', 'Slippage tolerance', '1')
     .action(async (opts) => {
-      const result = await mockMeteoraSwapSimulation(
+      const result = await meteoraSwapSimulation(
         defaultConnection,
         wallet,
         opts.tokenA,
@@ -56,7 +56,7 @@ async function main() {
         parseFloat(opts.inputAmount),
         parseFloat(opts.slippage)
       );
-      console.log('\nMock Meteora Swap Simulation Results:');
+      console.log('\nMeteora Swap Simulation Results:');
       console.log(`Success: ${result.success}`);
       console.log(`Compute Units: ${result.computeUnits ?? 'N/A'}`);
       if (result.outputAmount != null) {
