@@ -97,7 +97,7 @@ import {
         logs
       };
     } catch (error) {
-      console.error('Error in mockMeteoraSwapSimulation:', error);
+      console.error('Error in MeteoraSwapSimulation:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
