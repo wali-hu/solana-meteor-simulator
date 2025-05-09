@@ -1,130 +1,125 @@
+// simulator/src/meteoraSimulator.ts
+import {
+  Connection,
+  PublicKey,
+  Keypair,
+  Transaction,
+  VersionedTransaction,
+} from '@solana/web3.js';
+import { BN } from '@coral-xyz/anchor';
+import { tokenDecimals, USDC_MINT } from './meteora';
 
-import { 
-    Connection, 
-    PublicKey, 
-    Transaction, 
-    SimulatedTransactionResponse, 
-    Keypair 
-  } from '@solana/web3.js';
-  import { METEORA_DLMM_PROGRAM_ID, calculateExpectedOutput } from './meteora';
-  
-  /**
-   * Interface for simulation results
-   */
-  export interface SimulationResult {
-    success: boolean;
-    computeUnits?: number;
-    outputAmount?: number | bigint;
-    error?: string;
-    logs: string[];
-  }
-  
-  /**
-   * Perform a simulation of a Meteora swap
-   */
-  export async function meteoraSwapSimulation(
-    connection: Connection,
-    wallet: Keypair,
-    tokenA: string,
-    tokenB: string,
-    inputAmount: number,
-    slippage: number
-  ): Promise<SimulationResult> {
-    try {
-      console.log(`Simulating Meteora swap of ${inputAmount} tokens from ${tokenA} to ${tokenB}`);
-      
-      const tokenAMint = new PublicKey(tokenA);
-      const tokenBMint = new PublicKey(tokenB);
-      
+export interface SimulationResult {
+  estimatedOutTokens: number;
+  computeUnits: number;
+  error?: string;
+}
 
-      let tokenADecimals = 6;
-      let tokenBDecimals = 9; 
-      
-      if (tokenA === 'So11111111111111111111111111111111111111112') {
-        tokenADecimals = 9; 
-      } else if (tokenA === 'DCSTMVT3uGY2K1UnQAvA37ujQrW16bgxpErCseQZ3qV') {
-        tokenADecimals = 6; 
-      }
-      
-      if (tokenB === 'So11111111111111111111111111111111111111112') {
-        tokenBDecimals = 9; 
-      } else if (tokenB === 'DCSTMVT3uGY2K1UnQAvA37ujQrW16bgxpErCseQZ3qV') {
-        tokenBDecimals = 6; 
-      }
-      
-      let price = 10.5; 
-      
+export async function simulateSwap(
+  connection: Connection,
+  pool: any,           // Meteora pool instance
+  inAmount: number     // USDC amount, e.g. 1000.5
+): Promise<SimulationResult> {
+  try {
+    //  Refresh on-chain state
+    // The SDK requires you to reload poolState/reserves before quoting.
+    if (typeof pool.updateState === 'function') {
+      await pool.updateState();  
+    } else if (typeof pool.reload === 'function') {
+      await pool.reload();        // Some SDK versions use reload()
+    } else {
+      console.warn('Warning: pool state not refreshed—quotes may be stale');
+    }
 
-      if (tokenA === 'DCSTMVT3uGY2K1UnQAvA37ujQrW16bgxpErCseQZ3qV' && 
-          tokenB === 'So11111111111111111111111111111111111111112') {
-
-        price = 10.5;
-      } else if (tokenA === 'So11111111111111111111111111111111111111112' && 
-                 tokenB === 'DCSTMVT3uGY2K1UnQAvA37ujQrW16bgxpErCseQZ3qV') {
-
-        price = 0.095;
-      }
-      
-      const expectedOutput = calculateExpectedOutput(
-        inputAmount,
-        tokenADecimals,
-        tokenBDecimals,
-        price,
-        0.0025 
-      );
-      
-
-      const outputWithSlippage = expectedOutput * (1 - slippage / 100);
-
-      const computeUnits = 35000 + Math.floor(Math.random() * 15000);
-      
-      const logs = [
-        `Program ${METEORA_DLMM_PROGRAM_ID.toString()} invoke [1]`,
-        `Program log: Instruction: Swap`,
-        `Program log: Input token: ${tokenA}`,
-        `Program log: Output token: ${tokenB}`,
-        `Program log: Input amount: ${inputAmount}`,
-        `Program log: Expected output: ${expectedOutput}`,
-        `Program log: Actual output: ${outputWithSlippage}`,
-        `Program ${METEORA_DLMM_PROGRAM_ID.toString()} consumed ${computeUnits} of 200000 compute units`,
-        `Program ${METEORA_DLMM_PROGRAM_ID.toString()} success`
-      ];
-      
+    // Ensure trading is enabled
+    // Pools have poolState.enabled and possibly poolState.activationTimestamp
+    if (pool.poolState?.enabled === false) {
       return {
-        success: true,
-        computeUnits,
-        outputAmount: expectedOutput,
-        logs
-      };
-    } catch (error) {
-      console.error('Error in MeteoraSwapSimulation:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        logs: [`Error: ${error instanceof Error ? error.message : 'Unknown error'}`]
+        estimatedOutTokens: 0,
+        computeUnits: 0,
+        error: 'Pool is currently disabled for trading',
       };
     }
-  }
-  
+    // Optional: check activation timestamp
+    if (pool.poolState?.activationTimestamp) {
+      const now = Math.floor(Date.now() / 1000);
+      if (now < pool.poolState.activationTimestamp.toNumber()) {
+        return {
+          estimatedOutTokens: 0,
+          computeUnits: 0,
+          error: 'Pool trading not yet activated on-chain',
+        };
+      }
+    }
 
-  export async function simulateMeteoraSwap(
-    connection: Connection,
-    transaction: Transaction
-  ): Promise<SimulatedTransactionResponse> {
-    const simulationResponse: SimulatedTransactionResponse = {
-      err: null,
-      logs: [
-        `Program ${METEORA_DLMM_PROGRAM_ID.toString()} invoke [1]`,
-        `Program log: Instruction: Swap`,
-        `Program log: Processing Meteora swap`,
-        `Program log: Swap successful`,
-        `Program ${METEORA_DLMM_PROGRAM_ID.toString()} consumed 150000 of 200000 compute units`,
-        `Program ${METEORA_DLMM_PROGRAM_ID.toString()} success`
-      ],
-      accounts: null,
-      unitsConsumed: 150000,
-      returnData: null
-    };
-    
-    return simulationResponse;
+    //  Identify mints
+    if (!pool.tokenAMint || !pool.tokenBMint) {
+      console.error('Pool shape:', Object.keys(pool));
+      return {
+        estimatedOutTokens: 0,
+        computeUnits: 0,
+        error: 'Unexpected pool fields; tokenAMint/tokenBMint missing',
+      };
+    }
+    const tokenA = new PublicKey(pool.tokenAMint);
+    const tokenB = new PublicKey(pool.tokenBMint);
+
+    // Determine which is USDC←→Token
+    const baseMint = tokenA.equals(USDC_MINT) ? tokenA
+                   : tokenB.equals(USDC_MINT) ? tokenB
+                   : null;
+    const outMint  = baseMint?.equals(tokenA) ? tokenB
+                   : baseMint?.equals(tokenB) ? tokenA
+                   : null;
+    if (!baseMint || !outMint) {
+      return {
+        estimatedOutTokens: 0,
+        computeUnits: 0,
+        error: 'Pool does not contain USDC',
+      };
+    }
+
+    //  Fetch a live quote
+    const baseDecimals = tokenDecimals(baseMint);
+    const inLamports   = new BN(Math.round(inAmount * 10 ** baseDecimals));
+    const slippage     = 0.01;  // 1% tolerance
+    const { minSwapOutAmount } = pool.getSwapQuote(outMint, inLamports, slippage);
+
+    //  Build the swap transaction
+    const payer = Keypair.generate();
+    const swapTx: Transaction = await pool.swap(
+      payer.publicKey,
+      outMint,
+      inLamports,
+      minSwapOutAmount
+    );
+    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    swapTx.recentBlockhash = blockhash;
+    swapTx.feePayer       = payer.publicKey;
+
+    //  Simulate with VersionedTransaction for CU usage
+    const messageV0 = swapTx.compileMessage();
+    const vtx       = new VersionedTransaction(messageV0);
+    const simulation = await connection.simulateTransaction(vtx, {
+      replaceRecentBlockhash: true,
+      sigVerify: false,
+    });
+    if (simulation.value.err) {
+      return {
+        estimatedOutTokens: 0,
+        computeUnits: 0,
+        error: JSON.stringify(simulation.value.err),
+      };
+    }
+    const computeUnits = simulation.value.unitsConsumed ?? 0;
+
+    // Convert output lamports → token float
+    const outDecimals = tokenDecimals(outMint);
+    const estimatedOut = minSwapOutAmount.toNumber() / 10 ** outDecimals;
+
+    return { estimatedOutTokens: estimatedOut, computeUnits };
+  } catch (err: any) {
+    // Capture any assert or unexpected errors
+    return { estimatedOutTokens: 0, computeUnits: 0, error: err.message };
   }
+}

@@ -1,77 +1,55 @@
-#!/usr/bin/env node
-import dotenv from 'dotenv';
-dotenv.config();  // Load .env variables
+// index.ts
+import * as dotenv from 'dotenv';
+dotenv.config();
 
-import { program } from 'commander';
-import {
-  Connection,
-  Keypair,
-  SimulateTransactionConfig,
-
-} from '@solana/web3.js';
-import bs58 from 'bs58';
-
-import { meteoraSwapSimulation } from './meteoraSimulator';
-
-
-// Simulation config for the new overload
-const simConfig: SimulateTransactionConfig = {
-  replaceRecentBlockhash: true,
-  sigVerify: false,
-  commitment: 'confirmed',
-};
-
-// Default Solana connection (can be overridden per-command)
-const defaultConnection = new Connection(
-  process.env.RPC_ENDPOINT || 'https://api.mainnet-beta.solana.com',
-  'confirmed'
-);
-
-// Load or generate wallet
-const wallet = process.env.WALLET_PRIVATE_KEY
-  ? Keypair.fromSecretKey(bs58.decode(process.env.WALLET_PRIVATE_KEY))
-  : Keypair.generate();
+import { Connection, PublicKey } from '@solana/web3.js';
+import { findPoolForToken } from './meteora';
+import { simulateSwap } from './meteoraSimulator';
 
 async function main() {
-  program
-    .version('1.0.0')
-    .description('Solana transaction simulator for Orca and Meteora swaps');
+  const args = process.argv.slice(2);
+  if (args.length < 2) {
+    console.error('Usage: ts-node index.ts <TOKEN_MINT> <AMOUNT_IN_USDC>');
+    process.exit(1);
+  }
 
-  
+  const [tokenMintArg, amountArg] = args;
+  const tokenMint = new PublicKey(tokenMintArg);
+  const amount = parseFloat(amountArg);
+  if (isNaN(amount) || amount <= 0) {
+    console.error('ERROR: <AMOUNT_IN_USDC> must be a positive number.');
+    process.exit(1);
+  }
 
-  // Meteora swap
-  program
-    .command('meteora-swap')
-    .description('Simulate a Meteora swap without sending a transaction')
-    .requiredOption('--token-a <address>')
-    .requiredOption('--token-b <address>')
-    .requiredOption('--input-amount <amount>')
-    .option('--slippage <percent>', 'Slippage tolerance', '1')
-    .action(async (opts) => {
-      const result = await meteoraSwapSimulation(
-        defaultConnection,
-        wallet,
-        opts.tokenA,
-        opts.tokenB,
-        parseFloat(opts.inputAmount),
-        parseFloat(opts.slippage)
-      );
-      console.log('\nMeteora Swap Simulation Results:');
-      console.log(`Success: ${result.success}`);
-      console.log(`Compute Units: ${result.computeUnits ?? 'N/A'}`);
-      if (result.outputAmount != null) {
-        console.log(`Output Amount: ${result.outputAmount}`);
-      }
-      if (result.error) {
-        console.log(`Error: ${result.error}`);
-      }
-      console.log('\nTransaction Logs:');
-      result.logs.forEach((log) => console.log(log));
-    });
+  // 1. Connect to mainnet-beta
+  const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
 
+  // 2. Find the appropriate Meteora pool
+  const pool = await findPoolForToken(connection, tokenMint);
+  if (!pool) {
+    console.error(`No Meteora pool found for token mint ${tokenMint.toBase58()}`);
+    process.exit(1);
+  }
 
-  // Parse CLI args and run
-  await program.parseAsync(process.argv);
+  // 3. Simulate the USDC→token swap
+  const { estimatedOutTokens, computeUnits, error } = await simulateSwap(
+    connection,
+    pool,
+    amount
+  );
+
+  if (error) {
+    console.error('Simulation error:', error);
+    process.exit(1);
+  }
+
+  console.log(`\n=== Swap Simulation Results ===`);
+  console.log(`Input:  ${amount.toFixed(6)} USDC`);
+  console.log(`Output: ${estimatedOutTokens.toFixed(6)} tokens`);
+  console.log(`Compute Units Consumed: ${computeUnits}`);
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error('Fatal error:', err);
+  process.exit(1);
+});

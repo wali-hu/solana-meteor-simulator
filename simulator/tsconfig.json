@@ -1,14 +1,12 @@
 {
-    "compilerOptions": {
-      "target": "es6",
-      "module": "commonjs",
-      "outDir": "dist",
-      "rootDir": "src",
-      "strict": true,
-      "esModuleInterop": true,
-      "resolveJsonModule": true,
-      "skipLibCheck": true,
-      "forceConsistentCasingInFileNames": true
-    },
-    "include": ["src/**/*"]
-  }
+  "extends": "../tsconfig.json",                    // ← Inherit root settings
+  "compilerOptions": {
+    "rootDir": "src",                               // ← CLI source
+    "outDir": "dist",
+    "module": "commonjs",
+    "target": "es2020",
+    "strict": true,
+    "esModuleInterop": true
+  },
+  "include": ["src/**/*"]
+}
